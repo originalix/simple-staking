@@ -2,12 +2,13 @@ import { AiOutlineInfoCircle } from "react-icons/ai";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Tooltip } from "react-tooltip";
 
-import { FinalityProvider as FinalityProviderInterface } from "@/app/types/finalityProviders";
 import {
   LoadingTableList,
   LoadingView,
 } from "@/app/components/Loading/Loading";
 import { QueryMeta } from "@/app/types/api";
+import { FinalityProvider as FinalityProviderInterface } from "@/app/types/finalityProviders";
+
 import { FinalityProvider } from "./FinalityProvider";
 
 interface FinalityProvidersProps {
@@ -28,7 +29,7 @@ export const FinalityProviders: React.FC<FinalityProvidersProps> = ({
   return (
     <div className="card flex flex-col gap-2 bg-base-300 p-4 shadow-sm lg:flex-1">
       <h3 className="mb-4 font-bold">Finality Providers</h3>
-      <div className="hidden gap-2 px-4 text-sm lg:grid lg:grid-cols-finalityProviders ">
+      <div className="lg:grid-cols-finalityProviders hidden gap-2 px-4 text-sm lg:grid ">
         <p>Finality Provider</p>
         <div className="flex items-center gap-1">
           <p>Delegations</p>

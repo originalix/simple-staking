@@ -1,43 +1,70 @@
 import {
-  WalletProvider,
-  Network,
-  Fees,
-  UTXO,
-  WalletInfo,
-} from "../wallet_provider";
+  getNetworkConfig,
+  network,
+  validateAddress,
+} from "@/config/network.config";
+
 import {
   getAddressBalance,
-  getTipHeight,
   getFundingUTXOs,
   getNetworkFees,
+  getTipHeight,
   pushTx,
 } from "../../mempool_api";
+import {
+  Fees,
+  Network,
+  UTXO,
+  WalletInfo,
+  WalletProvider,
+} from "../wallet_provider";
 
 // window object for OKX Wallet extension
 export const okxProvider = "okxwallet";
 
 export class OKXWallet extends WalletProvider {
   private okxWalletInfo: WalletInfo | undefined;
+  private okxWallet: any;
+  private bitcoinNetworkProvider: any;
+  private networkEnv: Network | undefined;
 
   constructor() {
     super();
-  }
 
-  connectWallet = async (): Promise<this> => {
-    const workingVersion = "2.83.26";
     // check whether there is an OKX Wallet extension
     if (!window[okxProvider]) {
       throw new Error("OKX Wallet extension not found");
     }
+
+    this.okxWallet = window[okxProvider];
+    this.networkEnv = getNetworkConfig().network;
+
+    // OKX uses different providers for different networks
+    switch (this.networkEnv) {
+      case Network.MAINNET:
+        this.bitcoinNetworkProvider = this.okxWallet.bitcoin;
+        break;
+      case Network.TESTNET:
+        this.bitcoinNetworkProvider = this.okxWallet.bitcoinTestnet;
+        break;
+      case Network.SIGNET:
+        this.bitcoinNetworkProvider = this.okxWallet.bitcoinSignet;
+        break;
+      default:
+        throw new Error("Unsupported network");
+    }
+  }
+
+  connectWallet = async (): Promise<this> => {
+    const workingVersion = "2.83.26";
 
     const version = await window[okxProvider].getVersion();
     if (version < workingVersion) {
       throw new Error("Please update OKX Wallet to the latest version");
     }
 
-    const okxwallet = window[okxProvider];
     try {
-      await okxwallet.enable(); // Connect to OKX Wallet extension
+      await this.okxWallet.enable(); // Connect to OKX Wallet extension
     } catch (error) {
       if ((error as Error)?.message?.includes("rejected")) {
         throw new Error("Connection to OKX Wallet was rejected");
@@ -47,13 +74,15 @@ export class OKXWallet extends WalletProvider {
     }
     let result = null;
     try {
-      // this will not throw an error even if user has no BTC Signet enabled
-      result = await okxwallet?.bitcoinSignet?.connect();
+      // this will not throw an error even if user has no network enabled
+      result = await this.bitcoinNetworkProvider.connect();
     } catch (error) {
-      throw new Error("BTC Signet is not enabled in OKX Wallet");
+      throw new Error(`BTC ${this.networkEnv} is not enabled in OKX Wallet`);
     }
 
     const { address, compressedPublicKey } = result;
+
+    validateAddress(network, address);
 
     if (compressedPublicKey && address) {
       this.okxWalletInfo = {
@@ -88,8 +117,8 @@ export class OKXWallet extends WalletProvider {
     if (!this.okxWalletInfo) {
       throw new Error("OKX Wallet not connected");
     }
-    // sign the PSBT
-    return (await this.signPsbts([psbtHex]))[0];
+    // Use signPsbt since it shows the fees
+    return await this.bitcoinNetworkProvider.signPsbt(psbtHex);
   };
 
   signPsbts = async (psbtsHexes: string[]): Promise<string[]> => {
@@ -97,21 +126,26 @@ export class OKXWallet extends WalletProvider {
       throw new Error("OKX Wallet not connected");
     }
     // sign the PSBTs
-    return await window[okxProvider]?.bitcoinSignet?.signPsbts(psbtsHexes);
+    return await this.bitcoinNetworkProvider.signPsbts(psbtsHexes);
   };
 
   signMessageBIP322 = async (message: string): Promise<string> => {
     if (!this.okxWalletInfo) {
       throw new Error("OKX Wallet not connected");
     }
-    return await window[okxProvider].bitcoinSignet?.signMessage(
+    return await this.bitcoinNetworkProvider.signMessage(
       message,
       "bip322-simple",
     );
   };
 
   getNetwork = async (): Promise<Network> => {
-    return "testnet";
+    // OKX does not provide a way to get the network for Signet and Testnet
+    // So we pass the check on connection and return the environment network
+    if (!this.networkEnv) {
+      throw new Error("Network not set");
+    }
+    return this.networkEnv;
   };
 
   on = (eventName: string, callBack: () => void) => {
@@ -120,7 +154,7 @@ export class OKXWallet extends WalletProvider {
     }
     // subscribe to account change event
     if (eventName === "accountChanged") {
-      return window[okxProvider].bitcoinSignet.on(eventName, callBack);
+      return this.okxWallet.on(eventName, callBack);
     }
   };
 

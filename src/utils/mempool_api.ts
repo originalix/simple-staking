@@ -1,4 +1,8 @@
+import { getNetworkConfig } from "@/config/network.config";
+
 import { Fees, UTXO } from "./wallet/wallet_provider";
+
+const { mempoolApiUrl } = getNetworkConfig();
 
 /*
     URL Construction methods
@@ -6,16 +10,11 @@ import { Fees, UTXO } from "./wallet/wallet_provider";
 // The base URL for the signet API
 // Utilises an environment variable specifying the mempool API we intend to
 // utilise
-const mempoolAPI = `${process.env.NEXT_PUBLIC_MEMPOOL_API}/signet/api/`;
+const mempoolAPI = `${mempoolApiUrl}/api/`;
 
 // URL for the address info endpoint
 function addressInfoUrl(address: string): URL {
   return new URL(mempoolAPI + "address/" + address);
-}
-
-// URL for the transactions info endpoint
-function txInfoUrl(txid: string): URL {
-  return new URL(mempoolAPI + "tx/" + txid);
 }
 
 // URL for the push transaction endpoint
@@ -36,6 +35,17 @@ function networkFeesUrl(): URL {
 // URL for retrieving the tip height of the BTC chain
 function btcTipHeightUrl(): URL {
   return new URL(mempoolAPI + "blocks/tip/height");
+}
+
+// URL for validating an address which contains a set of information about the address
+// including the scriptPubKey
+function validateAddressUrl(address: string): URL {
+  return new URL(mempoolAPI + "v1/validate-address/" + address);
+}
+
+// URL for the transaction info endpoint
+function txInfoUrl(txId: string): URL {
+  return new URL(mempoolAPI + "tx/" + txId);
 }
 
 /**
@@ -114,16 +124,16 @@ export async function getTipHeight(): Promise<number> {
 }
 
 /**
- * Retrieve a set of UTXOs that are available to an address and are enough to
- * fund a transaction with a total `amount` of Satoshis in its output. The UTXOs
- * are chosen based on descending amount order.
+ * Retrieve a set of UTXOs that are available to an address
+ * and satisfy the `amount` requirement if provided. Otherwise, fetch all UTXOs.
+ * The UTXOs are chosen based on descending amount order.
  * @param address - The Bitcoin address in string format.
  * @param amount - The amount we expect the resulting UTXOs to satisfy.
  * @returns A promise that resolves into a list of UTXOs.
  */
 export async function getFundingUTXOs(
   address: string,
-  amount: number,
+  amount?: number,
 ): Promise<UTXO[]> {
   // Get all UTXOs for the given address
 
@@ -144,32 +154,52 @@ export async function getFundingUTXOs(
     .filter((utxo: any) => utxo.status.confirmed)
     .sort((a: any, b: any) => b.value - a.value);
 
-  // Reduce the list of UTXOs into a list that contains just enough
-  // UTXOs to satisfy the `amount` requirement.
-  var sum = 0;
-  for (var i = 0; i < confirmedUTXOs.length; ++i) {
-    sum += confirmedUTXOs[i].value;
-    if (sum > amount) {
-      break;
+  // If amount is provided, reduce the list of UTXOs into a list that
+  // contains just enough UTXOs to satisfy the `amount` requirement.
+  let sliced = confirmedUTXOs;
+  if (amount) {
+    var sum = 0;
+    for (var i = 0; i < confirmedUTXOs.length; ++i) {
+      sum += confirmedUTXOs[i].value;
+      if (sum > amount) {
+        break;
+      }
     }
+    if (sum < amount) {
+      return [];
+    }
+    sliced = confirmedUTXOs.slice(0, i + 1);
   }
-  if (sum < amount) {
-    return [];
+
+  const response = await fetch(validateAddressUrl(address));
+  const addressInfo = await response.json();
+  const { isvalid, scriptPubKey } = addressInfo;
+  if (!isvalid) {
+    throw new Error("Invalid address");
   }
-  const sliced = confirmedUTXOs.slice(0, i + 1);
 
   // Iterate through the final list of UTXOs to construct the result list.
   // The result contains some extra information,
-  var result = [];
-  for (var i = 0; i < sliced.length; ++i) {
-    const response = await fetch(txInfoUrl(sliced[i].txid));
-    const transactionInfo = await response.json();
-    result.push({
-      txid: sliced[i].txid,
-      vout: sliced[i].vout,
-      value: sliced[i].value,
-      scriptPubKey: transactionInfo.vout[sliced[i].vout].scriptpubkey,
-    });
+  return sliced.map((s: any) => {
+    return {
+      txid: s.txid,
+      vout: s.vout,
+      value: s.value,
+      scriptPubKey: scriptPubKey,
+    };
+  });
+}
+
+/**
+ * Retrieve information about a transaction.
+ * @param txId - The transaction ID in string format.
+ * @returns A promise that resolves into the transaction information.
+ */
+export async function getTxInfo(txId: string): Promise<any> {
+  const response = await fetch(txInfoUrl(txId));
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err);
   }
-  return result;
+  return await response.json();
 }

@@ -1,148 +1,186 @@
-import { Psbt } from 'bitcoinjs-lib'
-import { WalletProvider, Network, Fees, UTXO, WalletInfo, } from "../wallet_provider";
+import { Psbt } from "bitcoinjs-lib";
+
+import { getNetworkConfig } from "@/config/network.config";
+
 import {
   getAddressBalance,
-  getTipHeight,
   getFundingUTXOs,
   getNetworkFees,
+  getTipHeight,
   pushTx,
 } from "../../mempool_api";
+import { Fees, Network, UTXO, WalletProvider } from "../wallet_provider";
 
 // window object for Bitget Wallet extension
 export const bitgetWalletProvider = "bitkeep";
 
+// Internal network names
+const INTERNAL_NETWORK_NAMES = {
+  [Network.MAINNET]: "livenet",
+  [Network.TESTNET]: "testnet",
+  [Network.SIGNET]: "signet",
+};
+
 export class BitgetWallet extends WalletProvider {
-  private bitgetWalletInfo: WalletInfo | undefined;
-  private provider = window?.[bitgetWalletProvider]?.unisat
+  private bitcoinNetworkProvider: any;
+  private networkEnv: Network | undefined;
+
   constructor() {
     super();
+
+    // check whether there is an Bitget Wallet extension
+    if (!window[bitgetWalletProvider]?.unisat) {
+      throw new Error("Bitget Wallet extension not found");
+    }
+    this.networkEnv = getNetworkConfig().network;
+
+    this.bitcoinNetworkProvider = window[bitgetWalletProvider].unisat;
   }
 
   connectWallet = async (): Promise<any> => {
-    // check whether there is an Bitget Wallet extension
-    if (!this.provider) {
-      throw new Error("Bitget Wallet extension not found");
+    if (!this.networkEnv) {
+      throw new Error("Network not found");
     }
 
     try {
-      await this.provider?.requestAccounts() // Connect to Bitget Wallet extension
-      await this.provider?.switchNetwork('signet')
+      await this.bitcoinNetworkProvider.switchNetwork(
+        INTERNAL_NETWORK_NAMES[this.networkEnv],
+      );
+
+      await this.bitcoinNetworkProvider.requestAccounts(); // Connect to Bitget Wallet extension
     } catch (error) {
-      if ((error as Error)?.message?.includes('rejected')) {
-        throw new Error('Connection to Bitget Wallet was rejected')
+      if ((error as Error)?.message?.includes("rejected")) {
+        throw new Error("Connection to Bitget Wallet was rejected");
       } else {
-        throw new Error((error as Error)?.message)
+        throw new Error((error as Error)?.message);
       }
     }
 
-    const address = await this.getAddress()
-    const publicKeyHex = await this.getPublicKeyHex()
+    const address = await this.getAddress();
+    const publicKeyHex = await this.getPublicKeyHex();
 
     if (!address || !publicKeyHex) {
       throw new Error("Could not connect to Bitget Wallet");
     }
-    this.bitgetWalletInfo = {
-      publicKeyHex,
-      address,
-    };
     return this;
   };
 
   getWalletProviderName = async (): Promise<string> => {
-    return 'Bitget Wallet';
+    return "Bitget Wallet";
   };
 
   getAddress = async (): Promise<string> => {
-    let accounts = (await this.provider?.getAccounts()) || []
+    let accounts = (await this.bitcoinNetworkProvider.getAccounts()) || [];
     if (!accounts?.[0]) {
       throw new Error("Bitget Wallet not connected");
     }
-    return accounts[0]
+    return accounts[0];
   };
 
   getPublicKeyHex = async (): Promise<string> => {
-    let publicKey = await this.provider?.getPublicKey()
+    let publicKey = await this.bitcoinNetworkProvider.getPublicKey();
     if (!publicKey) {
       throw new Error("Bitget Wallet not connected");
     }
-    return publicKey
+    return publicKey;
   };
 
   signPsbt = async (psbtHex: string): Promise<string> => {
     const data = {
-      method: 'signPsbt',
+      method: "signPsbt",
       params: {
-        from: this.provider?.selectedAddress,
-        __internalFunc: '__signPsbt_babylon',
+        from: this.bitcoinNetworkProvider.selectedAddress,
+        __internalFunc: "__signPsbt_babylon",
         psbtHex,
         options: {
-          autoFinalized: true
-        }
-      }
+          autoFinalized: true,
+        },
+      },
+    };
+
+    let signedPsbt = await this.bitcoinNetworkProvider.request(
+      "dappsSign",
+      data,
+    );
+    let psbt = Psbt.fromHex(signedPsbt);
+
+    const allFinalized = psbt.data.inputs.every(
+      (input) => input.finalScriptWitness || input.finalScriptSig,
+    );
+    if (!allFinalized) {
+      psbt.finalizeAllInputs();
     }
 
-    let signedPsbt = await this.provider?.request('dappsSign', data)
-    let psbt = Psbt.fromHex(signedPsbt)
-
-    const allFinalized = psbt.data.inputs.every(input => input.finalScriptWitness || input.finalScriptSig);
-    if(!allFinalized){
-      psbt.finalizeAllInputs()
-    }
-
-    return psbt.toHex()
+    return psbt.toHex();
   };
 
   signPsbts = async (psbtsHexes: string[]): Promise<string[]> => {
     if (!psbtsHexes && !Array.isArray(psbtsHexes)) {
-      throw new Error('params error')
+      throw new Error("params error");
     }
-    const options = psbtsHexes.map(_ => {
+    const options = psbtsHexes.map((_) => {
       return {
-        autoFinalized: true
-      }
-    })
+        autoFinalized: true,
+      };
+    });
     const data = {
-      method: 'signPsbt',
+      method: "signPsbt",
       params: {
-        from: this.provider?.selectedAddress,
-        __internalFunc: '__signPsbts_babylon',
-        psbtHex: '_',
+        from: this.bitcoinNetworkProvider.selectedAddress,
+        __internalFunc: "__signPsbts_babylon",
+        psbtHex: "_",
         psbtHexs: psbtsHexes,
-        options
-      }
-    }
+        options,
+      },
+    };
 
     try {
-      let signedPsbts = await this.provider?.request('dappsSign', data)
-      signedPsbts = signedPsbts.split(',')
-      return signedPsbts.map((tx:string) => {
-        let psbt = Psbt.fromHex(tx)
+      let signedPsbts = await this.bitcoinNetworkProvider.request(
+        "dappsSign",
+        data,
+      );
+      signedPsbts = signedPsbts.split(",");
+      return signedPsbts.map((tx: string) => {
+        let psbt = Psbt.fromHex(tx);
 
-        const allFinalized = psbt.data.inputs.every(input => input.finalScriptWitness || input.finalScriptSig);
-        if(!allFinalized){
-          psbt.finalizeAllInputs()
+        const allFinalized = psbt.data.inputs.every(
+          (input) => input.finalScriptWitness || input.finalScriptSig,
+        );
+        if (!allFinalized) {
+          psbt.finalizeAllInputs();
         }
 
-        return psbt.toHex()
-      })
+        return psbt.toHex();
+      });
     } catch (error) {
-      throw new Error((error as Error)?.message)
+      throw new Error((error as Error)?.message);
     }
   };
 
   signMessageBIP322 = async (message: string): Promise<string> => {
-    return await this.provider?.signMessage(message, 'bip322-simple')
+    return await this.bitcoinNetworkProvider.signMessage(
+      message,
+      "bip322-simple",
+    );
   };
 
   getNetwork = async (): Promise<Network> => {
-    return await this.provider?.getNetwork()
+    const internalNetwork = await this.bitcoinNetworkProvider.getNetwork();
+
+    for (const [key, value] of Object.entries(INTERNAL_NETWORK_NAMES)) {
+      if (value === internalNetwork) {
+        return key as Network;
+      }
+    }
+
+    throw new Error("Unsupported network");
   };
 
   on = (eventName: string, callBack: () => void) => {
-    if(eventName === 'accountChanged'){
-      return this.provider?.on('accountsChanged', callBack);
+    if (eventName === "accountChanged") {
+      return this.bitcoinNetworkProvider.on("accountsChanged", callBack);
     }
-    return this.provider?.on(eventName, callBack);
+    return this.bitcoinNetworkProvider.on(eventName, callBack);
   };
 
   // Mempool calls
@@ -158,7 +196,7 @@ export class BitgetWallet extends WalletProvider {
     return await pushTx(txHex);
   };
 
-  getUtxos = async (address: string, amount: number): Promise<UTXO[]> => {
+  getUtxos = async (address: string, amount?: number): Promise<UTXO[]> => {
     return await getFundingUTXOs(address, amount);
   };
 

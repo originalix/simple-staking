@@ -1,18 +1,24 @@
-import { ChangeEvent, FocusEvent, useState } from "react";
+import { ChangeEvent, FocusEvent, useEffect, useState } from "react";
+
+import { getNetworkConfig } from "@/config/network.config";
+import { blocksToDisplayTime } from "@/utils/blocksToDisplayTime";
 
 import { validateNoDecimalPoints } from "./validation/validation";
-import { blocksToWeeks } from "@/utils/blocksToWeeks";
 
 interface StakingTimeProps {
   minStakingTimeBlocks: number;
   maxStakingTimeBlocks: number;
+  unbondingTimeBlocks: number;
   onStakingTimeBlocksChange: (inputTimeBlocks: number) => void;
+  reset: boolean;
 }
 
 export const StakingTime: React.FC<StakingTimeProps> = ({
   minStakingTimeBlocks,
   maxStakingTimeBlocks,
+  unbondingTimeBlocks,
   onStakingTimeBlocksChange,
+  reset,
 }) => {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
@@ -21,6 +27,15 @@ export const StakingTime: React.FC<StakingTimeProps> = ({
 
   const errorLabel = "Staking term";
   const generalErrorMessage = "You should input staking term";
+
+  const { coinName } = getNetworkConfig();
+
+  // Use effect to reset the state when reset prop changes
+  useEffect(() => {
+    setValue("");
+    setError("");
+    setTouched(false);
+  }, [reset]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -87,15 +102,20 @@ export const StakingTime: React.FC<StakingTimeProps> = ({
     return (
       <div className="card mb-2 bg-base-200 p-4">
         <p>
-          Your Signet BTC will be staked for a fixed term of{" "}
-          {blocksToWeeks(minStakingTimeBlocks, 5)}.
+          You can unbond and withdraw your stake anytime with an unbonding time
+          of {blocksToDisplayTime(unbondingTimeBlocks)}.
         </p>
         <p>
-          You can unbond and withdraw your Signet BTC anytime through this
-          dashboard with an unbond time of 7 days.
+          There is also a build-in maximum staking period of{" "}
+          {blocksToDisplayTime(minStakingTimeBlocks)}.
         </p>
         <p>
-          The above times are approximates based on average Bitcoin block times.
+          If the stake is not unbonded before the end of this period, it will
+          automatically become withdrawable by you anytime afterwards.
+        </p>
+        <p>
+          The above times are approximates based on average {coinName} block
+          time.
         </p>
       </div>
     );

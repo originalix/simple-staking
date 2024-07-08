@@ -1,10 +1,11 @@
-import { useRef } from "react";
-import { Modal } from "react-responsive-modal";
 import { IoMdClose } from "react-icons/io";
 
-import { blocksToWeeks } from "@/utils/blocksToWeeks";
+import { getNetworkConfig } from "@/config/network.config";
+import { blocksToDisplayTime } from "@/utils/blocksToDisplayTime";
 import { satoshiToBtc } from "@/utils/btcConversions";
 import { maxDecimals } from "@/utils/maxDecimals";
+
+import { GeneralModal } from "./GeneralModal";
 
 interface PreviewModalProps {
   open: boolean;
@@ -13,6 +14,9 @@ interface PreviewModalProps {
   finalityProvider: string | undefined;
   stakingAmountSat: number;
   stakingTimeBlocks: number;
+  stakingFeeSat: number;
+  feeRate: number;
+  unbondingTimeBlocks: number;
 }
 
 export const PreviewModal: React.FC<PreviewModalProps> = ({
@@ -21,25 +25,18 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   finalityProvider,
   stakingAmountSat,
   stakingTimeBlocks,
+  unbondingTimeBlocks,
   onSign,
+  stakingFeeSat,
+  feeRate,
 }) => {
-  const modalRef = useRef(null);
-
   const cardStyles =
     "card border bg-base-300 p-4 text-sm dark:border-0 dark:bg-base-200";
 
+  const { coinName } = getNetworkConfig();
+
   return (
-    <Modal
-      ref={modalRef}
-      open={open}
-      onClose={() => onClose(false)}
-      classNames={{
-        modalContainer: "flex items-end justify-center md:items-center",
-        modal:
-          "m-0 w-full max-w-none rounded-t-2xl bg-base-300 shadow-lg md:w-auto md:max-w-[45rem] md:rounded-b-2xl lg:max-w-[55rem]",
-      }}
-      showCloseIcon={false}
-    >
+    <GeneralModal open={open} onClose={onClose}>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-bold">Preview</h3>
         <button
@@ -58,20 +55,33 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             <p>{finalityProvider || "-"}</p>
           </div>
           <div className={`${cardStyles} flex-1`}>
-            <p className="text-xs dark:text-neutral-content">Amount</p>
-            <p>{`${maxDecimals(satoshiToBtc(stakingAmountSat), 8)} Signet BTC`}</p>
+            <p className="text-xs dark:text-neutral-content">Stake Amount</p>
+            <p>{`${maxDecimals(satoshiToBtc(stakingAmountSat), 8)} ${coinName}`}</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className={`${cardStyles} flex-1`}>
+            <p className="text-xs dark:text-neutral-content">Fee rate</p>
+            <p>{feeRate} sat/vB</p>
+          </div>
+          <div className={`${cardStyles} flex-1`}>
+            <p className="text-xs dark:text-neutral-content">Transaction fee</p>
+            <p>{`${maxDecimals(satoshiToBtc(stakingFeeSat), 8)} ${coinName}`}</p>
           </div>
         </div>
         <div className="flex flex-col gap-4 md:flex-row">
           <div className={`${cardStyles} basis-1/5`}>
             <p className="text-xs dark:text-neutral-content">Term</p>
-            <p>{blocksToWeeks(stakingTimeBlocks, 5)}</p>
+            <p>{blocksToDisplayTime(stakingTimeBlocks)}</p>
           </div>
           <div className={`${cardStyles} basis-4/5`}>
             <p className="text-xs dark:text-neutral-content">
               On-demand unbonding
             </p>
-            <p>Enabled (7 days unbonding time)</p>
+            <p>
+              Enabled ({blocksToDisplayTime(unbondingTimeBlocks)} unbonding
+              time)
+            </p>
           </div>
         </div>
         <h4 className="text-center text-base">Attention!</h4>
@@ -81,7 +91,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           So please stake wisely.
         </p>
         <p className="dark:text-neutral-content">
-          2. No third party possesses your staked Signet BTC. You are the only
+          2. No third party possesses your staked {coinName}. You are the only
           one who can unbond and withdraw your stake.
         </p>
         <div className="flex gap-4">
@@ -98,6 +108,6 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           </button>
         </div>
       </div>
-    </Modal>
+    </GeneralModal>
   );
 };

@@ -1,12 +1,15 @@
-import { useRef } from "react";
-import { Modal } from "react-responsive-modal";
 import { IoMdClose } from "react-icons/io";
+
+import { blocksToDisplayTime } from "@/utils/blocksToDisplayTime";
+
+import { GeneralModal } from "./GeneralModal";
 
 export const MODE_UNBOND = "unbond";
 export const MODE_WITHDRAW = "withdraw";
 export type MODE = typeof MODE_UNBOND | typeof MODE_WITHDRAW;
 
 interface PreviewModalProps {
+  unbondingTimeBlocks: number;
   open: boolean;
   onClose: (value: boolean) => void;
   onProceed: () => void;
@@ -14,42 +17,33 @@ interface PreviewModalProps {
 }
 
 export const UnbondWithdrawModal: React.FC<PreviewModalProps> = ({
+  unbondingTimeBlocks,
   open,
   onClose,
   onProceed,
   mode,
 }) => {
-  const modalRef = useRef(null);
-
   const unbondTitle = "Unbond";
+
   const unbondContent = (
     <>
       You are about to unbond your stake before its expiration. The expected
-      unbonding time will be about <strong>7 days</strong>.<br />
+      unbonding time will be about{" "}
+      <strong>{blocksToDisplayTime(unbondingTimeBlocks)}</strong>.
+      <br />
       After unbonded, you will need to use this dashboard to withdraw your stake
-      for it to appear in your wallet. OK to proceed?
+      for it to appear in your wallet.
     </>
   );
 
   const withdrawTitle = "Withdraw";
-  const withdrawContent =
-    "You are about to withdraw your stake. OK to proceed?";
+  const withdrawContent = "You are about to withdraw your stake.";
 
   const title = mode === MODE_UNBOND ? unbondTitle : withdrawTitle;
   const content = mode === MODE_UNBOND ? unbondContent : withdrawContent;
 
   return (
-    <Modal
-      ref={modalRef}
-      open={open}
-      onClose={() => onClose(false)}
-      classNames={{
-        modalContainer: "flex items-end justify-center md:items-center",
-        modal:
-          "m-0 w-full max-w-none rounded-t-2xl bg-base-300 shadow-lg md:w-auto md:max-w-[24rem] md:rounded-b-2xl",
-      }}
-      showCloseIcon={false}
-    >
+    <GeneralModal open={open} onClose={onClose} small>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-bold">{title}</h3>
         <button
@@ -81,6 +75,6 @@ export const UnbondWithdrawModal: React.FC<PreviewModalProps> = ({
           </button>
         </div>
       </div>
-    </Modal>
+    </GeneralModal>
   );
 };

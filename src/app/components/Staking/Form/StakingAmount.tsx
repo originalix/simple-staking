@@ -1,7 +1,9 @@
-import { ChangeEvent, FocusEvent, useState } from "react";
+import { ChangeEvent, FocusEvent, useEffect, useState } from "react";
 
+import { getNetworkConfig } from "@/config/network.config";
 import { btcToSatoshi, satoshiToBtc } from "@/utils/btcConversions";
 import { maxDecimals } from "@/utils/maxDecimals";
+
 import { validateDecimalPoints } from "./validation/validation";
 
 interface StakingAmountProps {
@@ -9,6 +11,7 @@ interface StakingAmountProps {
   maxStakingAmountSat: number;
   btcWalletBalanceSat: number;
   onStakingAmountSatChange: (inputAmountSat: number) => void;
+  reset: boolean;
 }
 
 export const StakingAmount: React.FC<StakingAmountProps> = ({
@@ -16,6 +19,7 @@ export const StakingAmount: React.FC<StakingAmountProps> = ({
   maxStakingAmountSat,
   btcWalletBalanceSat,
   onStakingAmountSatChange,
+  reset,
 }) => {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
@@ -24,6 +28,15 @@ export const StakingAmount: React.FC<StakingAmountProps> = ({
 
   const errorLabel = "Staking amount";
   const generalErrorMessage = "You should input staking amount";
+
+  const { coinName } = getNetworkConfig();
+
+  // Use effect to reset the state when reset prop changes
+  useEffect(() => {
+    setValue("");
+    setError("");
+    setTouched(false);
+  }, [reset]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -62,11 +75,11 @@ export const StakingAmount: React.FC<StakingAmountProps> = ({
       },
       {
         valid: satoshis >= minStakingAmountSat,
-        message: `${errorLabel} must be at least ${satoshiToBtc(minStakingAmountSat)} Signet BTC.`,
+        message: `${errorLabel} must be at least ${satoshiToBtc(minStakingAmountSat)} ${coinName}.`,
       },
       {
         valid: satoshis <= maxStakingAmountSat,
-        message: `${errorLabel} must be no more than ${satoshiToBtc(maxStakingAmountSat)} Signet BTC.`,
+        message: `${errorLabel} must be no more than ${satoshiToBtc(maxStakingAmountSat)} ${coinName}.`,
       },
       {
         valid: satoshis <= btcWalletBalanceSat,
@@ -98,7 +111,7 @@ export const StakingAmount: React.FC<StakingAmountProps> = ({
       <div className="label pt-0">
         <span className="label-text-alt text-base">Amount</span>
         <span className="label-text-alt opacity-50">
-          min/max: {minStakeAmount}/{maxStakeAmount} Signet BTC
+          min/max: {minStakeAmount}/{maxStakeAmount} {coinName}
         </span>
       </div>
       <input
@@ -107,11 +120,13 @@ export const StakingAmount: React.FC<StakingAmountProps> = ({
         value={value}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="Signet BTC"
+        placeholder={coinName}
       />
-      <div className="mb-2 mt-4 min-h-[20px]">
-        <p className="text-center text-sm text-error">{error}</p>
-      </div>
+      {error && (
+        <div className="my-2 min-h-[20px]">
+          <p className="text-center text-sm text-error">{error}</p>
+        </div>
+      )}
     </label>
   );
 };

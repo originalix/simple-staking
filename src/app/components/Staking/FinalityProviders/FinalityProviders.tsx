@@ -1,11 +1,12 @@
 import InfiniteScroll from "react-infinite-scroll-component";
 
-import { FinalityProvider as FinalityProviderInterface } from "@/app/types/finalityProviders";
 import {
   LoadingTableList,
   LoadingView,
 } from "@/app/components/Loading/Loading";
 import { QueryMeta } from "@/app/types/api";
+import { FinalityProvider as FinalityProviderInterface } from "@/app/types/finalityProviders";
+
 import { FinalityProvider } from "./FinalityProvider";
 
 interface FinalityProvidersProps {
@@ -42,11 +43,11 @@ export const FinalityProviders: React.FC<FinalityProvidersProps> = ({
         </a>
         .
       </p>
-      <div className="hidden gap-2 px-4 lg:grid lg:grid-cols-stakingFinalityProviders">
+      <div className="hidden gap-2 px-4 lg:grid lg:grid-cols-stakingFinalityProvidersDesktop">
         <p>Finality Provider</p>
         <p>BTC PK</p>
         <p>Total Delegation</p>
-        <p>Comission</p>
+        <p>Commission</p>
       </div>
       <div
         id="finality-providers"
@@ -64,12 +65,14 @@ export const FinalityProviders: React.FC<FinalityProvidersProps> = ({
           {finalityProviders?.map((fp) => (
             <FinalityProvider
               key={fp.btcPk}
-              moniker={fp.description.moniker}
+              moniker={fp.description?.moniker}
               pkHex={fp.btcPk}
               stakeSat={fp.activeTVLSat}
-              comission={fp.commission}
+              commission={fp.commission}
               selected={selectedFinalityProvider?.btcPk === fp.btcPk}
-              onClick={() => onFinalityProviderChange(fp.btcPk)}
+              onClick={() => {
+                onFinalityProviderChange(fp.btcPk);
+              }}
             />
           ))}
         </InfiniteScroll>

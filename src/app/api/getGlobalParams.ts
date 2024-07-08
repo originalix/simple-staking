@@ -1,13 +1,15 @@
 import { AxiosResponse } from "axios";
 
-import { apiWrapper } from "./apiWrapper";
 import { GlobalParamsVersion } from "../types/globalParams";
+
+import { apiWrapper } from "./apiWrapper";
 
 interface GlobalParamsDataResponse {
   versions: {
     version: number;
     activation_height: number;
     staking_cap: number;
+    cap_height: number;
     tag: string;
     covenant_pks: string[];
     covenant_quorum: number;
@@ -34,6 +36,7 @@ export const getGlobalParams = async (): Promise<GlobalParamsVersion[]> => {
     version: v.version,
     activationHeight: v.activation_height,
     stakingCapSat: v.staking_cap,
+    stakingCapHeight: v.cap_height,
     tag: v.tag,
     covenantPks: v.covenant_pks,
     covenantQuorum: v.covenant_quorum,

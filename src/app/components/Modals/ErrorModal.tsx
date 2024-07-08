@@ -1,11 +1,10 @@
-import { useRef } from "react";
-import { Modal } from "react-responsive-modal";
-import { IoMdClose } from "react-icons/io";
 import { format } from "date-fns";
-import { useTheme } from "next-themes";
+import { IoMdClose } from "react-icons/io";
 
-import { ErrorState, ShowErrorParams } from "@/app/types/errors";
 import { useError } from "@/app/context/Error/ErrorContext";
+import { ErrorState, ShowErrorParams } from "@/app/types/errors";
+
+import { GeneralModal } from "./GeneralModal";
 
 interface ErrorModalProps {
   open: boolean;
@@ -24,9 +23,6 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
   errorState,
   errorTime,
 }) => {
-  const modalRef = useRef(null);
-  const { resolvedTheme } = useTheme();
-  const lightSelected = resolvedTheme === "light";
   const { error, retryErrorAction } = useError();
 
   const handleRetry = () => {
@@ -68,7 +64,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
   const getErrorMessage = () => {
     switch (errorState) {
       case ErrorState.SERVER_ERROR:
-        return `Error fetching data`;
+        return `Error fetching data due to: ${errorMessage}`;
       case ErrorState.UNBONDING:
         return `Your request to unbound failed due to: ${errorMessage}`;
       case ErrorState.WITHDRAW:
@@ -85,18 +81,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
   const formattedErrorTime = format(errorTime, "dd MMMM yyyy 'at' HH:mm:ss");
 
   return (
-    <Modal
-      ref={modalRef}
-      open={open}
-      onClose={() => onClose()}
-      classNames={{
-        root: `${lightSelected ? "light" : "dark"}`,
-        modalContainer: "flex items-end justify-center md:items-center",
-        modal:
-          "m-0 w-full max-w-none rounded-t-2xl bg-base-300 shadow-lg md:max-w-[45rem] md:rounded-b-2xl lg:max-w-[55rem]",
-      }}
-      showCloseIcon={false}
-    >
+    <GeneralModal open={open} onClose={onClose}>
       <div className="mb- flex items-center justify-end">
         <button
           className="btn btn-circle btn-ghost btn-sm"
@@ -128,6 +113,6 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
           )}
         </div>
       </div>
-    </Modal>
+    </GeneralModal>
   );
 };

@@ -1,5 +1,5 @@
 # Step 1. Rebuild the source code only when needed
-FROM node:18-alpine3.19 AS builder
+FROM node:22-alpine3.19 AS builder
 
 WORKDIR /app
 
@@ -21,10 +21,11 @@ COPY docker-entrypoint.sh .
 # with the docker environment variables we have set
 RUN NEXT_PUBLIC_MEMPOOL_API=APP_NEXT_PUBLIC_MEMPOOL_API \
     NEXT_PUBLIC_API_URL=APP_NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_NETWORK=APP_NEXT_PUBLIC_NETWORK \
     yarn build
 
 # Step 2. Production image, copy all the files and run next
-FROM node:18-alpine3.19 AS runner
+FROM node:22-alpine3.19 AS runner
 
 WORKDIR /app
 
